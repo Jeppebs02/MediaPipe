@@ -82,7 +82,7 @@ if __name__ == '__main__':
         print("No faces found, exiting")
         exit(0)
 
-    # Visualize detection result.
+    # Visualize detection result
     # mp_image.numpy_view() is an RGB numpy array, vi skal bruge rgb til visualizer.visualize
     image_rgb = np.copy(mp_image.numpy_view())
 
