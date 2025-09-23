@@ -28,7 +28,7 @@ if __name__ == '__main__':
     print_hi('PyCharm')
 
     # Configuration
-    IMAGE_FILE_NAME = "brother-977170_1280.jpg"
+    IMAGE_FILE_NAME = "tortoise-polarized-Quay-best-sunglasses-for-men-3694841875.jpeg"
 
     IMAGE_FILE = os.path.join("images", IMAGE_FILE_NAME)
 
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         base_options=landmark_base_options,
         output_face_blendshapes=True,
         running_mode=vision.RunningMode.IMAGE,
-        num_faces=2
+        num_faces=1
     )
 
 

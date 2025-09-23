@@ -315,7 +315,7 @@ class DetectionVisualizer:
         detection_result = self.analyze_landmarks(IMAGE_FILE_NAME, options)
 
         # Check for landmarks
-        print(f"Found {len(detection_result.face_landmarks)} face(s)")
+        print(f"Found {len(detection_result.face_landmarks)} face(s) and landmarks")
         if len(detection_result.face_landmarks) == 0:
             print("No face landmarks found, exiting.")
             return detection_result
