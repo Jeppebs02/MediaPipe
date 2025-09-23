@@ -6,6 +6,10 @@ import os
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from mediapipe import solutions
+from mediapipe.framework.formats import landmark_pb2
+import matplotlib.pyplot as plt
+
 
 
 class DetectionVisualizer:
@@ -15,22 +19,30 @@ class DetectionVisualizer:
                  font_size: int = 1,
                  font_thickness: int = 1,
                  text_color: Tuple[int, int, int] = (255, 0, 0),
-                 MODEL_NAME: str = "blaze_face_short_range.tflite",
+                 DETECTOR_MODEL_NAME: str = "blaze_face_short_range.tflite",
+                 LANDMARKER_MODEL_NAME: str = "face_landmarker.task",
 
 
 
 
                  ):
 
-        self.MODEL_FILE = os.path.join("models", MODEL_NAME)
-        if not os.path.isfile(self.MODEL_FILE):
+        self.DETECTOR_MODEL_FILE = os.path.join("models", DETECTOR_MODEL_NAME)
+        if not os.path.isfile(self.DETECTOR_MODEL_FILE):
             raise FileNotFoundError(
-                f"Model not found: {self.MODEL_FILE}\n"
+                f"Model not found: {self.DETECTOR_MODEL_FILE}\n"
                 "Place a MediaPipe face detection .tflite model at this path."
+            )
+        
+        self.LANDMARKER_MODEL_FILE = os.path.join("models", LANDMARKER_MODEL_NAME)
+        if not os.path.isfile(self.LANDMARKER_MODEL_FILE):
+            raise FileNotFoundError(
+                f"Landmarker model not found: {self.LANDMARKER_MODEL_FILE}\n"
+                "Place the face landmarker .task model at this path."
             )
 
         self.OUT_DIR = "out"
-        self.MODEL_NAME = MODEL_NAME
+        self.MODEL_NAME = DETECTOR_MODEL_NAME
         self.margin = margin
         self.row_size = row_size
         self.font_size = font_size
@@ -104,9 +116,78 @@ class DetectionVisualizer:
 
         return annotated_image
 
+    def draw_landmarks_on_image(self, rgb_image, detection_result):
+        face_landmarks_list = detection_result.face_landmarks
+        annotated_image = np.copy(rgb_image)
+
+        # Loop through the detected faces to visualize.
+        for idx in range(len(face_landmarks_list)):
+            face_landmarks = face_landmarks_list[idx]
+
+            # Draw the face landmarks.
+            face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
+            face_landmarks_proto.landmark.extend([
+                landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in face_landmarks
+            ])
+
+            solutions.drawing_utils.draw_landmarks(
+                image=annotated_image,
+                landmark_list=face_landmarks_proto,
+                connections=mp.solutions.face_mesh.FACEMESH_TESSELATION,
+                landmark_drawing_spec=None,
+                connection_drawing_spec=mp.solutions.drawing_styles
+                .get_default_face_mesh_tesselation_style())
+            solutions.drawing_utils.draw_landmarks(
+                image=annotated_image,
+                landmark_list=face_landmarks_proto,
+                connections=mp.solutions.face_mesh.FACEMESH_CONTOURS,
+                landmark_drawing_spec=None,
+                connection_drawing_spec=mp.solutions.drawing_styles
+                .get_default_face_mesh_contours_style())
+            solutions.drawing_utils.draw_landmarks(
+                image=annotated_image,
+                landmark_list=face_landmarks_proto,
+                connections=mp.solutions.face_mesh.FACEMESH_IRISES,
+                landmark_drawing_spec=None,
+                connection_drawing_spec=mp.solutions.drawing_styles
+                .get_default_face_mesh_iris_connections_style())
+
+        return annotated_image
+
+    def plot_face_blendshapes_bar_graph(self, face_blendshapes):
+        # Extract the face blendshapes category names and scores.
+        face_blendshapes_names = [face_blendshapes_category.category_name for face_blendshapes_category in
+                                  face_blendshapes]
+        face_blendshapes_scores = [face_blendshapes_category.score for face_blendshapes_category in face_blendshapes]
+        # The blendshapes are ordered in decreasing score value.
+        face_blendshapes_ranks = range(len(face_blendshapes_names))
+
+        fig, ax = plt.subplots(figsize=(12, 12))
+        bar = ax.barh(face_blendshapes_ranks, face_blendshapes_scores, label=[str(x) for x in face_blendshapes_ranks])
+        ax.set_yticks(face_blendshapes_ranks, face_blendshapes_names)
+        ax.invert_yaxis()
+
+        # Label each bar with values
+        for score, patch in zip(face_blendshapes_scores, bar.patches):
+            plt.text(patch.get_x() + patch.get_width(), patch.get_y(), f"{score:.4f}", va="top")
+
+        ax.set_xlabel('Score')
+        ax.set_title("Face Blendshapes")
+        plt.tight_layout()
+        plt.show()
 
 
+
+
+
+
+
+
+    # Detection functions
     def analyze_image(self, IMAGE_FILE_NAME: str, options: Optional[vision.FaceDetectorOptions] = None) -> vision.FaceDetectorResult:
+        """
+        Analyzes an image to detect faces and returns the raw result.
+        """
         IMAGE_FILE = os.path.join("images", IMAGE_FILE_NAME)
         if not os.path.isfile(IMAGE_FILE):
             raise FileNotFoundError(f"Image not found: {IMAGE_FILE}")
@@ -114,9 +195,9 @@ class DetectionVisualizer:
 
 
 
-        if not os.path.isfile(self.MODEL_FILE):
+        if not os.path.isfile(self.DETECTOR_MODEL_FILE):
             raise FileNotFoundError(
-                f"Model not found: {self.MODEL_FILE}\n"
+                f"Model not found: {self.DETECTOR_MODEL_FILE}\n"
                 "Place a MediaPipe face detection .tflite model at this path."
             )
 
@@ -127,7 +208,7 @@ class DetectionVisualizer:
         # Create detector and config
 
         if options is None:
-            base_options = python.BaseOptions(model_asset_path=self.MODEL_FILE)
+            base_options = python.BaseOptions(model_asset_path=self.DETECTOR_MODEL_FILE)
             # "The minimum confidence score for the face detection to be considered successful."
             # Default er 0.5
             detection_confidence = 0.5
@@ -158,9 +239,10 @@ class DetectionVisualizer:
 
         return detection_result
 
-
-
     def analyze_and_annotate_image(self, IMAGE_FILE_NAME: str, OUT_FILE_NAME: str, options: Optional[vision.FaceDetectorOptions] = None) -> vision.FaceDetectorResult:
+        """
+        Analyzes, annotates, and plots face detection results.
+        """
         detection_result = self.analyze_image(IMAGE_FILE_NAME, options)
 
         print(f"Found {len(detection_result.detections)} faces")
@@ -178,5 +260,74 @@ class DetectionVisualizer:
         # Save the result
         cv2.imwrite(OUT_FILE, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
         print(f"Annotated image written to {OUT_FILE}")
+
+        return detection_result
+
+
+    #Landmark functions
+
+    def analyze_landmarks(self, IMAGE_FILE_NAME: str, options: Optional[vision.FaceLandmarkerOptions] = None) -> vision.FaceLandmarkerResult:
+        """
+        Analyzes an image to detect face landmarks and returns the raw result.
+        """
+        IMAGE_FILE = os.path.join("images", IMAGE_FILE_NAME)
+        if not os.path.isfile(IMAGE_FILE):
+            raise FileNotFoundError(f"Image not found: {IMAGE_FILE}")
+
+        if not os.path.isfile(self.LANDMARKER_MODEL_FILE):
+            raise FileNotFoundError(
+                f"Model not found: {self.LANDMARKER_MODEL_FILE}\n"
+                "Place the MediaPipe face landmarker .task model at this path."
+            )
+
+        self.ensure_dir(self.OUT_DIR)
+
+        # Create landmarker and config
+        if options is None:
+            # Create default options if none are provided.
+            base_options = python.BaseOptions(model_asset_path=self.LANDMARKER_MODEL_FILE)
+            options = vision.FaceLandmarkerOptions(
+                base_options=base_options,
+                output_face_blendshapes=True,
+                output_facial_transformation_matrixes=True,
+                running_mode=vision.RunningMode.IMAGE,
+                num_faces=1
+            )
+            landmarker = vision.FaceLandmarker.create_from_options(options)
+        else:
+            landmarker = vision.FaceLandmarker.create_from_options(options)
+
+        # Load into mediapipe
+        mp_image = mp.Image.create_from_file(IMAGE_FILE)
+
+        # Run detection
+        detection_result = landmarker.detect(mp_image)
+
+        return detection_result
+
+    def analyze_and_annotate_landmarks(self, IMAGE_FILE_NAME: str, OUT_FILE_NAME: str, options: Optional[vision.FaceLandmarkerOptions] = None) -> vision.FaceLandmarkerResult:
+        """
+        Analyzes, annotates, and plots face landmark results.
+        """
+        # Analyze the image to get landmark data
+        detection_result = self.analyze_landmarks(IMAGE_FILE_NAME, options)
+
+        # Check for landmarks
+        print(f"Found {len(detection_result.face_landmarks)} face(s)")
+        if len(detection_result.face_landmarks) == 0:
+            print("No face landmarks found, exiting.")
+            return detection_result
+
+        IMAGE_FILE = os.path.join("images", IMAGE_FILE_NAME)
+        OUT_FILE = os.path.join(self.OUT_DIR, OUT_FILE_NAME)
+
+        # draw detection on image
+        image_rgb = cv2.cvtColor(cv2.imread(IMAGE_FILE), cv2.COLOR_BGR2RGB)
+        annotated_image = self.draw_landmarks_on_image(image_rgb, detection_result)
+
+        # Save image
+        cv2.imwrite(OUT_FILE, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+        print(f"Annotated landmark image written to {OUT_FILE}")
+
 
         return detection_result
