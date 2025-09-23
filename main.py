@@ -33,8 +33,8 @@ if __name__ == '__main__':
     IMAGE_FILE = os.path.join("images", IMAGE_FILE_NAME)
 
     MODEL_FILE = os.path.join("models", "blaze_face_short_range.tflite")
-    OUT_DIR = "out"
-    OUT_FILE = os.path.join(OUT_DIR, IMAGE_FILE_NAME+"_annotated.jpg")
+
+    OUT_FILE = IMAGE_FILE_NAME+"_annotated.jpg"
 
     if not os.path.isfile(IMAGE_FILE):
         raise FileNotFoundError(f"Image not found: {IMAGE_FILE}")
@@ -45,7 +45,7 @@ if __name__ == '__main__':
             "Place a MediaPipe face detection .tflite model at this path."
         )
 
-    ensure_dir(OUT_DIR)
+
 
     # Create detector and config
 
@@ -69,32 +69,12 @@ if __name__ == '__main__':
                                          min_suppression_threshold=min_suppression_threshold)
 
 
-    detector = vision.FaceDetector.create_from_options(options)
 
-    # Load into mediapipe
-    mp_image = mp.Image.create_from_file(IMAGE_FILE)
+    face_detector = DetectionVisualizer()
 
-    # Run detection
-    detection_result = detector.detect(mp_image)
+    detection_result = face_detector.analyze_image(IMAGE_FILE_NAME, options)
 
-    print(f"Found {len(detection_result.detections)} faces")
-    if len(detection_result.detections) == 0:
-        print("No faces found, exiting")
-        exit(0)
+    print(detection_result)
 
-    # Visualize detection result.
-    # mp_image.numpy_view() is an RGB numpy array, vi skal bruge rgb til visualizer.visualize
-    image_rgb = np.copy(mp_image.numpy_view())
-
-    visualizer = DetectionVisualizer()
-    annotated_rgb = visualizer.visualize(image_rgb, detection_result)
-
-    # Save to disk
-    annotated_bgr = cv2.cvtColor(annotated_rgb, cv2.COLOR_RGB2BGR)
-    ok = cv2.imwrite(OUT_FILE, annotated_bgr)
-    if not ok:
-        raise RuntimeError(f"Failed to write output to {OUT_FILE}")
-
-    print(f" Annotated image saved to: {OUT_FILE}")
-
+    face_detector.analyze_and_annotate_image(IMAGE_FILE_NAME, OUT_FILE, options)
 
