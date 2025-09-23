@@ -269,6 +269,7 @@ class DetectionVisualizer:
     def analyze_landmarks(self, IMAGE_FILE_NAME: str, options: Optional[vision.FaceLandmarkerOptions] = None) -> vision.FaceLandmarkerResult:
         """
         Analyzes an image to detect face landmarks and returns the raw result.
+        Defaults to detecting one face. Please use custom options to detect more.
         """
         IMAGE_FILE = os.path.join("images", IMAGE_FILE_NAME)
         if not os.path.isfile(IMAGE_FILE):
@@ -308,6 +309,7 @@ class DetectionVisualizer:
     def analyze_and_annotate_landmarks(self, IMAGE_FILE_NAME: str, OUT_FILE_NAME: str, options: Optional[vision.FaceLandmarkerOptions] = None) -> vision.FaceLandmarkerResult:
         """
         Analyzes, annotates, and plots face landmark results.
+        Defaults to detecting and plotting one face. Please use custom options to detect and plot more.
         """
         # Analyze the image to get landmark data
         detection_result = self.analyze_landmarks(IMAGE_FILE_NAME, options)
@@ -331,3 +333,4 @@ class DetectionVisualizer:
 
 
         return detection_result
+
